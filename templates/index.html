@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单图生成三维模型</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- 引入Three.js核心库和控制器 -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        /* 额外的样式 */
+        .image-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .image-container img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .image-container canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            pointer-events: all;
+        }
+        
+        .mode-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .mode-btn i {
+            font-size: 1rem;
+        }
+        
+        .mode-btn.active {
+            border-color: #4f46e5;
+            background: #4f46e5;
+            color: white;
+        }
+        
+        .mode-btn.active i {
+            color: white;
+        }
+        
+        .mode-btn:hover:not(.active) {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
+        
+        .prompt-stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .prompt-stats .stat-item {
+            text-align: center;
+        }
+        
+        .prompt-stats .stat-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        
+        .prompt-stats .stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #4f46e5;
+        }
+        
+        .color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+        
+        .color-box { background-color: #00ff00; }
+        .color-point-positive { background-color: #00ff00; }
+        .color-point-negative { background-color: #ff0000; }
+        
+        .legend {
+            display: flex;
+            gap: 15px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .tool-info {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #075985;
+        }
+        
+        .tool-info i {
+            color: #0284c7;
+        }
+        
+        /* 3D容器样式 */
+        .view3d-container {
+            width: 100%;
+            height: 300px;
+            position: relative;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: grab;
+        }
+        
+        .view3d-container:active {
+            cursor: grabbing;
+        }
+        
+        .view3d-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .format-select, .quality-select {
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            font-size: 0.9rem;
+            color: #334155;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .format-select:hover, .quality-select:hover {
+            border-color: #4f46e5;
+        }
+        
+        .format-select:focus, .quality-select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .model-metadata {
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #64748b;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .model-metadata span {
+            color: #4f46e5;
+            font-weight: 600;
+        }
+
+        /* 3D控制提示 */
+        .view3d-hint {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .view3d-hint i {
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-cut"></i>
+                    <h1>单图生成三维模型</h1>
+                </div>
+                <div class="status" id="status">
+                    <span class="dot" id="statusDot"></span>
+                    <span id="statusText">初始化中...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容 -->
+        <main class="main">
+            <!-- 左侧控制区 -->
+            <div class="sidebar">
+                <!-- 上传区域 -->
+                <div class="card">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> 1. 上传图片</h2>
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-image"></i>
+                        <p>点击或拖拽图片到此处</p>
+                        <span class="hint">支持 JPG、PNG、WEBP (最大16MB)</span>
+                        <input type="file" id="fileInput" accept="image/*" hidden>
+                    </div>
+                    <div class="image-info" id="imageInfo" style="display: none;">
+                        <i class="fas fa-check-circle"></i>
+                        <span id="imageSize"></span>
+                    </div>
+                </div>
+
+                <!-- 几何提示区域 -->
+                <div class="card">
+                    <h2><i class="fas fa-draw-polygon"></i> 2. 添加几何提示</h2>
+                    
+                    <div class="mode-buttons">
+                        <button id="boxModeBtn" class="mode-btn active">
+                            <i class="fas fa-square"></i> 框选
+                        </button>
+                        <button id="pointPositiveBtn" class="mode-btn">
+                            <i class="fas fa-plus-circle"></i> 正点
+                        </button>
+                        <button id="pointNegativeBtn" class="mode-btn">
+                            <i class="fas fa-minus-circle"></i> 负点
+                        </button>
+                    </div>
+                    
+                    <div class="tool-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="tooltipText">在图片上拖动鼠标绘制矩形框</span>
+                    </div>
+                    
+                    <div class="prompt-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">
+                                <span class="color-indicator color-box"></span> 框
+                            </span>
+                            <span id="boxCount" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">
+                                <span class="color-indicator color-point-positive"></span> 正点
+                            </span>
+                            <span id="pointPositiveCount" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">
+                                <span class="color-indicator color-point-negative"></span> 负点
+                            </span>
+                            <span id="pointNegativeCount" class="stat-value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 文本提示区域 -->
+                <div class="card">
+                    <h2><i class="fas fa-font"></i> 3. 输入文本提示 (可选)</h2>
+                    <div class="input-group">
+                        <textarea id="textPrompt" placeholder="例如: person, car, dog, cat... (可与几何提示组合使用)" rows="2"></textarea>
+                    </div>
+
+                    <button class="btn btn-primary btn-large" id="segmentBtn" disabled>
+                        <i class="fas fa-play"></i> 开始分割
+                    </button>
+
+                    <button class="btn btn-secondary btn-block" id="resetBtn">
+                        <i class="fas fa-eraser"></i> 清除所有提示
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧预览区 -->
+            <div class="content">
+                <!-- 图像对比 -->
+                <div class="comparison">
+                    <div class="image-card">
+                        <div class="image-header">
+                            <i class="fas fa-eye"></i>
+                            <span>原始图像 (可在此绘制提示)</span>
+                        </div>
+                        <div class="image-container" id="originalContainer">
+                            <img id="originalImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999' font-family='system-ui'%3E请先上传图片%3C/text%3E%3C/svg%3E" alt="原始图像">
+                            <canvas id="promptCanvas"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="image-card">
+                        <div class="image-header">
+                            <i class="fas fa-magic"></i>
+                            <span>分割结果</span>
+                        </div>
+                        <div class="image-container" id="resultContainer">
+                            <img id="resultImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999' font-family='system-ui'%3E等待分割%3C/text%3E%3C/svg%3E" alt="分割结果">
+                        </div>
+                        <!-- 添加下载按钮 -->
+                        <div style="padding: 10px; display: flex; gap: 10px;">
+                            <button class="btn btn-secondary" id="downloadResultBtn" disabled style="flex: 1;">
+                                <i class="fas fa-download"></i> 下载分割图片
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3D生成区域 -->
+                <div class="image-card">
+                    <div class="image-header">
+                        <i class="fas fa-cube"></i>
+                        <span>3D模型预览 (可拖拽旋转)</span>
+                    </div>
+                    <div class="view3d-container" id="view3dContainer">
+                        <!-- Three.js会在这里渲染canvas -->
+                        <div class="view3d-hint">
+                            <i class="fas fa-mouse-pointer"></i> 鼠标拖拽旋转 | 滚轮缩放
+                        </div>
+                    </div>
+                    <div style="padding: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="generate3DBtn" disabled style="flex: 1;">
+                            <i class="fas fa-cube"></i> 生成3D模型
+                        </button>
+                        <select id="modelFormatSelect" class="format-select" style="flex: 0.5;">
+                            <option value="glb">GLB</option>
+                            <option value="obj">OBJ</option>
+                            <option value="stl">STL</option>
+                            <option value="ply">PLY</option>
+                        </select>
+                    </div>
+                    <div style="padding: 0 15px 15px 15px;">
+                        <button class="btn btn-success btn-block" id="addTextureBtn" disabled>
+                            <i class="fas fa-paint-brush"></i> 添加纹理
+                        </button>
+                    </div>
+                    <div style="padding: 0 15px 15px 15px;">
+                        <button class="btn btn-secondary btn-block" id="download3DBtn" disabled>
+                            <i class="fas fa-download"></i> 下载
+                        </button>
+                    </div>
+                    <div id="modelMetadata" class="model-metadata" style="display: none;">
+                        <span>格式: <span id="modelFormat">GLB</span></span> • 
+                        <span>大小: <span id="modelSize">0 KB</span></span> • 
+                        <span>顶点: <span id="modelVertices">0</span></span>
+                    </div>
+                </div>
+
+                <!-- 使用说明 -->
+                <div class="stats-card" id="usageGuide">
+                    <div class="stats-header">
+                        <i class="fas fa-info-circle"></i>
+                        <span>使用说明</span>
+                    </div>
+                    <div style="padding: 10px; font-size: 0.9rem; color: #475569; line-height: 1.6;">
+                        <p><strong>📌 框选模式:</strong> 拖动鼠标绘制矩形框，将目标物体全部包含在框中，新框会覆盖旧框</p>
+                        <p><strong>📌 正点模式:</strong> 点击图片，标记想要分割的物体</p>
+                        <p><strong>📌 负点模式:</strong> 点击图片，标记不想要的区域</p>
+                        <p><strong>📌 组合使用:</strong> 可以先框选目标物体，再点选进行微调</p>
+                        <p><strong>📌 3D生成:</strong> 获得分割结果后，点击"生成3D模型"可从分割物体生成三维模型，支持鼠标拖拽旋转查看</p>
+                        <p><strong>📌 快捷键:</strong> Ctrl + Enter 快速开始分割</p>
+                    </div>
+                </div>
+
+                <!-- 结果统计 -->
+                <!-- <div class="stats-card" id="statsPanel" style="display: none;">
+                    <div class="stats-header">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>分割结果统计</span>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat">
+                            <span class="stat-label">检测数量</span>
+                            <span class="stat-value" id="statCount">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">最佳置信度</span>
+                            <span class="stat-value" id="statAvgConf">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">处理时间</span>
+                            <span class="stat-value" id="statTime">0s</span>
+                        </div>
+                    </div>
+                </div> -->
+            </div>
+        </main>
+
+        <!-- 消息通知 -->
+        <div class="toast" id="toast"></div>
+
+        <!-- 加载动画 -->
+        <div class="loader" id="loader" style="display: none;">
+            <div class="spinner"></div>
+            <p id="loaderMessage">处理中...</p>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    <script>
+        // 更新工具提示文本
+        document.addEventListener('DOMContentLoaded', function() {
+            const boxBtn = document.getElementById('boxModeBtn');
+            const pointPosBtn = document.getElementById('pointPositiveBtn');
+            const pointNegBtn = document.getElementById('pointNegativeBtn');
+            const tooltip = document.getElementById('tooltipText');
+            
+            if (boxBtn) {
+                boxBtn.addEventListener('click', function() {
+                    tooltip.innerHTML = '在图片上拖动鼠标绘制矩形框';
+                });
+            }
+            
+            if (pointPosBtn) {
+                pointPosBtn.addEventListener('click', function() {
+                    tooltip.innerHTML = '点击图片添加绿色正样本点';
+                });
+            }
+            
+            if (pointNegBtn) {
+                pointNegBtn.addEventListener('click', function() {
+                    tooltip.innerHTML = '点击图片添加红色负样本点';
+                });
+            }
+        });
+    </script>
+</body>
+</html>
