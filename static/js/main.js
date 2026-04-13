@@ -4,7 +4,7 @@
 
 class SAM3App {
     constructor() {
-        this.apiBase = '/api';
+        this.apiBase = 'http://172.23.148.136:49281/api';
         this.initialized = false;
         this.imageLoaded = false;
         this.resultLoaded = false;
