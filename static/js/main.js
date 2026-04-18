@@ -1276,6 +1276,8 @@ class SAM3App {
             this.showToast('请先生成3D模型', 'warning');
             return;
         }
+
+        this.showLoader('添加纹理中...');
         
         try {
             const response = await fetch(`${this.apiBase}/triposg/add_texture`, {
