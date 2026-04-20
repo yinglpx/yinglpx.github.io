@@ -1055,14 +1055,6 @@ class SAM3App {
                 bytes[i] = binaryString.charCodeAt(i);
             }
             await this.loadGLTFFromBuffer(bytes.buffer, 'glb');
-            // if (format === 'glb' || format === 'gltf') {
-            //     await this.loadGLTFFromBuffer(bytes.buffer, format);
-            // } else if (format === 'obj') {
-            //     await this.loadOBJFromBuffer(bytes.buffer);
-            // } else {
-            //     this.showToast(`不支持的模型格式: ${format}`, 'error');
-            //     this.hideLoader();
-            // }
         } catch (error) {
             console.error('处理模型数据失败:', error);
             this.showToast('❌ 模型数据解析失败', 'error');
@@ -1146,71 +1138,6 @@ class SAM3App {
             this.showToast('❌ 3D模块加载失败', 'error');
         }
     }
-
-    // // 从Buffer加载OBJ模型
-    // async loadOBJFromBuffer(buffer) {
-    //     try {
-    //         // 动态导入所需的模块
-    //         const THREE = await import('three');
-    //         const { OBJLoader } = await import('three/addons/loaders/OBJLoader.js');
-            
-    //         const loader = new OBJLoader();
-            
-    //         // 将ArrayBuffer转换为字符串
-    //         const decoder = new TextDecoder('utf-8');
-    //         const objString = decoder.decode(buffer);
-            
-    //         try {
-    //             // 解析OBJ字符串
-    //             const object = loader.parse(objString);
-                
-    //             // 移除当前模型
-    //             if (this.threeModel) {
-    //                 this.threeScene.remove(this.threeModel);
-    //             }
-                
-    //             this.threeModel = object;
-                
-    //             // 计算并居中
-    //             const box = new THREE.Box3().setFromObject(this.threeModel);
-    //             const center = box.getCenter(new THREE.Vector3());
-    //             const size = box.getSize(new THREE.Vector3());
-                
-    //             this.threeModel.position.x -= center.x;
-    //             this.threeModel.position.y -= center.y;
-    //             this.threeModel.position.z -= center.z;
-                
-    //             const maxDim = Math.max(size.x, size.y, size.z);
-    //             if (maxDim > 0) {
-    //                 const scale = 2.0 / maxDim;
-    //                 this.threeModel.scale.set(scale, scale, scale);
-    //             }
-                
-    //             this.threeModel.traverse((node) => {
-    //                 if (node.isMesh) {
-    //                     node.castShadow = true;
-    //                     node.receiveShadow = true;
-    //                 }
-    //             });
-                
-    //             this.threeScene.add(this.threeModel);
-                
-    //             this.threeCamera.position.set(3, 2, 5);
-    //             this.threeControls.target.set(0, 0, 0);
-    //             this.threeControls.update();
-                
-    //             this.hideLoader();
-    //             console.log('OBJ模型加载成功');
-    //         } catch (error) {
-    //             console.error('OBJ模型解析失败:', error);
-    //             this.hideLoader();
-    //             this.showToast('❌ OBJ模型解析失败', 'error');
-    //         }
-    //     } catch (error) {
-    //         console.error('加载OBJLoader失败:', error);
-    //         this.hideLoader();
-    //     }
-    // }
 
     async download3D() {
         console.log('download3D 被调用');
