@@ -1157,7 +1157,7 @@ class SAM3App {
             
             // 获取文件名（从响应头或使用默认名称）
             const contentDisposition = response.headers.get('content-disposition');
-            let filename = 'model.${format}';
+            let filename = `model.${format}`;
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
                 if (filenameMatch && filenameMatch[1]) {
